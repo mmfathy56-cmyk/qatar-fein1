@@ -1,0 +1,15 @@
+{
+  "name": "qatar-fein",
+  "version": "1.0.0",
+  "private": true,
+  "scripts": {
+    "build": "node -e \"const fs=require('fs');fs.mkdirSync('www',{recursive:true});['index.html','config.js'].forEach(f=>fs.copyFileSync(f,'www/'+f));fs.copyFileSync('node_modules/@supabase/supabase-js/dist/umd/supabase.js','www/supabase.js')\""
+  },
+  "dependencies": {
+    "@capacitor/android": "^6.1.0",
+    "@capacitor/cli": "^6.1.0",
+    "@capacitor/core": "^6.1.0",
+    "@capacitor/push-notifications": "^6.0.0",
+    "@supabase/supabase-js": "^2.45.4"
+  }
+}
