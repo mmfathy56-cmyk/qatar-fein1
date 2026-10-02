@@ -15,6 +15,8 @@ jobs:
       - run: npm install
       - run: npm run build
       - run: npx cap add android
+      - run: cp google-services.json android/app/google-services.json
+      - run: sed -i 's#<application#<uses-permission android:name="android.permission.POST_NOTIFICATIONS"/><application#' android/app/src/main/AndroidManifest.xml
       - run: npx cap sync android
       - run: cd android && chmod +x gradlew && ./gradlew assembleDebug
       - uses: actions/upload-artifact@v4
