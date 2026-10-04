@@ -1,5 +1,5 @@
 {
-  "appId": "com.yourname.qatarfein",
+  "appId": "com.mmfathy.qatarfein",
   "appName": "القطر فين؟",
   "webDir": "www",
   "plugins": { "PushNotifications": { "presentationOptions": ["badge", "sound", "alert"] } }
