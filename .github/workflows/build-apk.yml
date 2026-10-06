@@ -1,10 +1,36 @@
 name: Build APK
 on:
-  workflow_dispatch:
   push:
     branches: [main]
+  workflow_dispatch:
+    inputs:
+      mode:
+        description: "debug = تجربة | keystore = مفتاح الرفع | release = ملف النشر"
+        type: choice
+        options: [debug, keystore, release]
+        default: debug
+
 jobs:
-  apk:
+  keystore:
+    if: ${{ github.event_name == 'workflow_dispatch' && inputs.mode == 'keystore' }}
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/setup-java@v4
+        with: { distribution: temurin, java-version: 17 }
+      - name: Generate upload keystore
+        run: |
+          PW=$(openssl rand -hex 16)
+          keytool -genkeypair -keystore upload.jks -alias upload -keyalg RSA -keysize 2048 -validity 10000 -storepass "$PW" -keypass "$PW" -dname "CN=Qatar Fein, O=Qatar Fein, C=EG"
+          echo "$PW" > password.txt
+      - uses: actions/upload-artifact@v4
+        with:
+          name: upload-keystore
+          path: |
+            upload.jks
+            password.txt
+
+  build:
+    if: ${{ github.event_name == 'push' || inputs.mode == 'debug' || inputs.mode == 'release' }}
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -17,9 +43,35 @@ jobs:
       - run: npx cap add android
       - run: cp google-services.json android/app/google-services.json
       - run: sed -i 's#<application#<uses-permission android:name="android.permission.POST_NOTIFICATIONS"/><application#' android/app/src/main/AndroidManifest.xml
+      - name: App icon (optional)
+        run: |
+          if [ -f icon-only.png ] && [ -f icon-foreground.png ]; then
+            mkdir -p assets && cp icon-only.png icon-foreground.png assets/
+            npm install -D @capacitor/assets
+            npx capacitor-assets generate --android --iconBackgroundColor '#0b1d5b' || echo "icon generation skipped"
+          fi
+      - run: sed -i "s/versionCode 1/versionCode ${{ github.run_number }}/" android/app/build.gradle
       - run: npx cap sync android
-      - run: cd android && chmod +x gradlew && ./gradlew assembleDebug
+
+      - name: Build debug APK
+        if: ${{ github.event_name == 'push' || inputs.mode == 'debug' }}
+        run: cd android && chmod +x gradlew && ./gradlew assembleDebug
       - uses: actions/upload-artifact@v4
+        if: ${{ github.event_name == 'push' || inputs.mode == 'debug' }}
         with:
           name: qatar-fein-apk
           path: android/app/build/outputs/apk/debug/app-debug.apk
+
+      - name: Build release AAB
+        if: ${{ inputs.mode == 'release' }}
+        run: cd android && chmod +x gradlew && ./gradlew bundleRelease
+      - name: Sign AAB with upload key
+        if: ${{ inputs.mode == 'release' }}
+        env:
+          PW: ${{ secrets.KEYSTORE_PASSWORD }}
+        run: jarsigner -sigalg SHA256withRSA -digestalg SHA-256 -keystore upload.jks -storepass "$PW" -keypass "$PW" android/app/build/outputs/bundle/release/app-release.aab upload
+      - uses: actions/upload-artifact@v4
+        if: ${{ inputs.mode == 'release' }}
+        with:
+          name: qatar-fein-aab
+          path: android/app/build/outputs/bundle/release/app-release.aab
